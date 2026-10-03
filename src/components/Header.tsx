@@ -24,6 +24,7 @@ interface HeaderProps {
   savedCount: number;
   activeTab: 'feed' | 'saved';
   onSelectTab: (tab: 'feed' | 'saved') => void;
+  autoRefreshStatus?: string | null;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -38,6 +39,7 @@ export const Header: React.FC<HeaderProps> = ({
   savedCount,
   activeTab,
   onSelectTab,
+  autoRefreshStatus,
 }) => {
   const currentDateFormatted = new Intl.DateTimeFormat('pt-BR', {
     weekday: 'long',
@@ -65,6 +67,11 @@ export const Header: React.FC<HeaderProps> = ({
             <span className="capitalize text-slate-300 hidden sm:inline">
               {currentDateFormatted}
             </span>
+            <span className="text-slate-500 hidden sm:inline">|</span>
+            <span className="bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 text-[10px] font-semibold px-2 py-0.5 rounded-full flex items-center gap-1">
+              <RefreshCw className={`w-2.5 h-2.5 ${isRefreshing ? 'animate-spin' : ''}`} />
+              {isRefreshing ? 'Auto-Refresh em Andamento...' : 'Auto-Refresh Ativo ao Carregar'}
+            </span>
           </div>
 
           <div className="flex items-center gap-4 text-[11px]">
@@ -72,7 +79,7 @@ export const Header: React.FC<HeaderProps> = ({
               Sincronizado com <strong className="text-white">Google Search Grounding</strong>
             </span>
             <div className="flex items-center gap-1.5 text-slate-400">
-              <span className="text-slate-500">Última atualização:</span>
+              <span className="text-slate-500">Última sincronização:</span>
               <span className="font-medium text-amber-400">{formattedTime}</span>
             </div>
           </div>

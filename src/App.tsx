@@ -73,6 +73,7 @@ export default function App() {
   const [isPreferencesOpen, setIsPreferencesOpen] = useState<boolean>(false);
   const [isCapitalsOpen, setIsCapitalsOpen] = useState<boolean>(false);
   const [isDossierOpen, setIsDossierOpen] = useState<boolean>(false);
+  const [autoRefreshBanner, setAutoRefreshBanner] = useState<string | null>('Atualizando notícias automaticamente ao carregar a plataforma...');
 
   // Notification Toast
   const [toastMessage, setToastMessage] = useState<{ text: string; type: 'success' | 'info' | 'error' } | null>(null);
@@ -163,14 +164,45 @@ export default function App() {
   };
 
   useEffect(() => {
+    // 1. Instantly load initial cache and indicators so UI is immediately visible
     fetchNews();
     fetchIndicators();
+
+    // 2. AUTOMATIC REFRESH on every load / reload of the platform
+    handleRefresh(true);
+
+    // 3. Periodic background refresh every 10 minutes
+    const interval = setInterval(() => {
+      handleRefresh(true);
+    }, 10 * 60 * 1000);
+
+    // 4. Auto-refresh if user returns to the tab after 5+ minutes
+    let lastActive = Date.now();
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        const elapsed = Date.now() - lastActive;
+        if (elapsed > 5 * 60 * 1000) {
+          handleRefresh(true);
+        }
+        lastActive = Date.now();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
   }, []);
 
   // Refresh handler: triggers live Google Search Grounded refresh
-  const handleRefresh = async () => {
+  const handleRefresh = async (isAuto = false) => {
     setIsRefreshing(true);
-    showToast('Consultando as notícias mais recentes no Google Search...', 'info');
+    if (isAuto) {
+      setAutoRefreshBanner('Sincronizando as últimas notícias com o Google Search...');
+    } else {
+      showToast('Consultando as notícias mais recentes no Google Search...', 'info');
+    }
 
     try {
       const categoryTopic = selectedCategory !== 'todos' ? selectedCategory : '';
@@ -187,19 +219,29 @@ export default function App() {
         }
         setLastUpdated(data.lastUpdated || Date.now());
         const count = data.newCount || 0;
-        if (count > 0) {
-          showToast(`Sincronização concluída: ${count} nova(s) notícia(s) incorporadas via Google Search!`, 'success');
+        if (isAuto) {
+          showToast(
+            `Refresh automático: ${count > 0 ? `${count} nova(s) notícia(s) incorporadas via Google!` : 'Feed diário sincronizado com o Google Search ao carregar a plataforma!'}`,
+            'success'
+          );
         } else {
-          showToast('Feed diário verificado e atualizado com as últimas publicações.', 'success');
+          if (count > 0) {
+            showToast(`Sincronização concluída: ${count} nova(s) notícia(s) incorporadas via Google Search!`, 'success');
+          } else {
+            showToast('Feed diário verificado e atualizado com as últimas publicações.', 'success');
+          }
         }
       } else {
-        showToast('Atualizado com os registros mais recentes da região.', 'info');
+        showToast('Feed verificado com as fontes regionais do dia.', 'info');
       }
     } catch (err) {
       console.error('Refresh error:', err);
       showToast('Feed verificado com as fontes regionais do dia.', 'info');
     } finally {
       setIsRefreshing(false);
+      setTimeout(() => {
+        setAutoRefreshBanner(null);
+      }, 4000);
     }
   };
 
@@ -337,7 +379,7 @@ export default function App() {
       <Header
         darkMode={darkMode}
         onToggleDarkMode={() => setDarkMode(!darkMode)}
-        onRefresh={handleRefresh}
+        onRefresh={() => handleRefresh(false)}
         isRefreshing={isRefreshing}
         lastUpdated={lastUpdated}
         onOpenPreferences={() => setIsPreferencesOpen(true)}
@@ -345,6 +387,7 @@ export default function App() {
         onOpenDossier={() => setIsDossierOpen(true)}
         savedCount={savedArticles.length}
         activeTab={activeTab}
+        autoRefreshStatus={autoRefreshBanner}
         onSelectTab={(tab) => {
           setActiveTab(tab);
           if (tab === 'saved') {
@@ -355,6 +398,28 @@ export default function App() {
 
       {/* Page Container */}
       <main className="max-w-7xl mx-auto px-4 sm:px-8 py-6">
+        {/* Auto-Refresh Banner Notification on Load */}
+        {autoRefreshBanner && (
+          <div className="mb-4 flex items-center justify-between p-3.5 rounded-2xl bg-gradient-to-r from-orange-500/10 via-amber-500/10 to-emerald-500/10 border border-orange-300/80 dark:border-orange-500/30 backdrop-blur-md shadow-xs animate-in fade-in duration-300">
+            <div className="flex items-center gap-2.5 text-xs text-orange-950 dark:text-orange-200">
+              <span className="p-1.5 rounded-lg bg-orange-600 text-white shrink-0 shadow-xs">
+                <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin' : ''}`} />
+              </span>
+              <div>
+                <span className="font-bold text-orange-900 dark:text-orange-300">Refresh Automático Ativo:</span>{' '}
+                <span>{autoRefreshBanner}</span>
+              </div>
+            </div>
+            <button
+              onClick={() => setAutoRefreshBanner(null)}
+              className="text-xs text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1"
+              title="Fechar aviso"
+            >
+              ✕
+            </button>
+          </div>
+        )}
+
         {/* Indicators Bar */}
         <IndicatorsBar
           indicators={indicators}
@@ -433,7 +498,7 @@ export default function App() {
 
             {/* Refresh Button */}
             <button
-              onClick={handleRefresh}
+              onClick={() => handleRefresh(false)}
               disabled={isRefreshing}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-orange-600 hover:bg-orange-700 text-white text-xs font-semibold shadow-xs transition-colors disabled:opacity-50 cursor-pointer"
             >
@@ -470,7 +535,7 @@ export default function App() {
                 Limpar Todos os Filtros
               </button>
               <button
-                onClick={handleRefresh}
+                onClick={() => handleRefresh(false)}
                 className="px-4 py-2 rounded-xl bg-slate-200 dark:bg-slate-800 text-slate-800 dark:text-slate-200 text-xs font-semibold hover:bg-slate-300 dark:hover:bg-slate-700 transition-colors"
               >
                 Pesquisar no Google
