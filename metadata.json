@@ -1,0 +1,6 @@
+{
+  "name": "Nordeste Hoje - Notícias & Economia Diária",
+  "description": "Plataforma diária de notícias, economia, mercado, marketing e indicadores do Nordeste, Ceará, Fortaleza e todas as capitais com busca Google e exportação em PDF.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
