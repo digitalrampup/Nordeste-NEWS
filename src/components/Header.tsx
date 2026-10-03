@@ -6,10 +6,12 @@ import {
   SlidersHorizontal, 
   FileDown, 
   Bookmark, 
-  Layers,
   MapPin,
   TrendingUp,
-  Sparkles
+  Clock,
+  CloudSun,
+  ShieldCheck,
+  Building2
 } from 'lucide-react';
 
 interface HeaderProps {
@@ -18,6 +20,7 @@ interface HeaderProps {
   onRefresh: () => void;
   isRefreshing: boolean;
   lastUpdated: number;
+  secondsUntilNextRefresh: number;
   onOpenPreferences: () => void;
   onOpenCapitals: () => void;
   onOpenDossier: () => void;
@@ -33,6 +36,7 @@ export const Header: React.FC<HeaderProps> = ({
   onRefresh,
   isRefreshing,
   lastUpdated,
+  secondsUntilNextRefresh,
   onOpenPreferences,
   onOpenCapitals,
   onOpenDossier,
@@ -53,160 +57,192 @@ export const Header: React.FC<HeaderProps> = ({
     minute: '2-digit',
   });
 
+  const formatCountdown = (totalSeconds: number) => {
+    const mins = Math.floor(totalSeconds / 60);
+    const secs = totalSeconds % 60;
+    return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+  };
+
   return (
-    <header className="border-b transition-colors duration-200 sticky top-0 z-30 backdrop-blur-md bg-white/95 dark:bg-slate-900/95 border-slate-200 dark:border-slate-800">
-      {/* Top Banner: Date, live status & regional intelligence */}
-      <div className="bg-slate-900 dark:bg-black text-slate-300 text-xs py-1.5 px-4 sm:px-8 border-b border-slate-800">
+    <header className="border-b transition-colors duration-200 sticky top-0 z-30 backdrop-blur-md bg-white/95 dark:bg-slate-900/95 border-slate-200 dark:border-slate-800 shadow-xs">
+      {/* Sub-Masthead: Editorial Date, Weather & Grounding Certification */}
+      <div className="bg-slate-900 dark:bg-black text-slate-300 text-xs py-1.5 px-4 sm:px-8 border-b border-slate-800/80">
         <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-2">
-          <div className="flex items-center gap-2">
-            <span className="inline-block w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-            <span className="font-semibold text-white uppercase tracking-wider text-[11px]">
-              Edição Diária em Tempo Real
-            </span>
-            <span className="text-slate-500">|</span>
-            <span className="capitalize text-slate-300 hidden sm:inline">
+          {/* Left: Edition & Weather info */}
+          <div className="flex items-center gap-3 text-[11px]">
+            <span className="capitalize text-white font-medium">
               {currentDateFormatted}
             </span>
-            <span className="text-slate-500 hidden sm:inline">|</span>
-            <span className="bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 text-[10px] font-semibold px-2 py-0.5 rounded-full flex items-center gap-1">
-              <RefreshCw className={`w-2.5 h-2.5 ${isRefreshing ? 'animate-spin' : ''}`} />
-              {isRefreshing ? 'Auto-Refresh em Andamento...' : 'Auto-Refresh Ativo ao Carregar'}
-            </span>
+            <span className="text-slate-600 hidden sm:inline">•</span>
+            <div className="hidden md:flex items-center gap-2 text-slate-300">
+              <CloudSun className="w-3.5 h-3.5 text-amber-400" />
+              <span>Fortaleza 31°C</span>
+              <span className="text-slate-600">|</span>
+              <span>Salvador 29°C</span>
+              <span className="text-slate-600">|</span>
+              <span>Recife 28°C</span>
+            </div>
           </div>
 
-          <div className="flex items-center gap-4 text-[11px]">
-            <span className="text-slate-400 hidden md:inline">
-              Sincronizado com <strong className="text-white">Google Search Grounding</strong>
-            </span>
-            <div className="flex items-center gap-1.5 text-slate-400">
-              <span className="text-slate-500">Última sincronização:</span>
-              <span className="font-medium text-amber-400">{formattedTime}</span>
+          {/* Right: Sincronização & Auto-Refresh Timer */}
+          <div className="flex items-center gap-3 text-[11px]">
+            <div className="flex items-center gap-1.5 text-emerald-400 font-medium">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+              <span>Auto-Refresh Ativo (10m)</span>
+            </div>
+            <span className="text-slate-600 hidden sm:inline">•</span>
+            <div className="text-slate-400 hidden sm:flex items-center gap-1">
+              <span>Próximo ciclo:</span>
+              <span className="font-mono font-bold text-amber-400">
+                {formatCountdown(secondsUntilNextRefresh)}
+              </span>
+            </div>
+            <span className="text-slate-600">•</span>
+            <div className="text-slate-400 flex items-center gap-1">
+              <span>Sincronizado:</span>
+              <span className="font-semibold text-slate-200">{formattedTime}</span>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Main Navigation Header */}
+      {/* Main Masthead Banner */}
       <div className="max-w-7xl mx-auto px-4 sm:px-8 py-3.5 flex flex-col md:flex-row md:items-center justify-between gap-4">
-        {/* Logo and Tagline */}
+        {/* Brand Logo & Editorial Title */}
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3 cursor-pointer" onClick={() => onSelectTab('feed')}>
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-600 via-orange-600 to-rose-700 flex items-center justify-center shadow-md shadow-orange-500/20 text-white font-black text-xl tracking-tighter">
+          <div 
+            className="flex items-center gap-3 cursor-pointer group" 
+            onClick={() => onSelectTab('feed')}
+            title="Ir para o Feed Principal de Notícias"
+          >
+            <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-slate-900 via-orange-700 to-amber-600 flex items-center justify-center shadow-md shadow-orange-600/20 text-white font-black text-xl tracking-tighter border border-orange-500/30">
               NE
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h1 className="text-xl sm:text-2xl font-black tracking-tight text-slate-900 dark:text-white font-serif">
-                  NORDESTE <span className="text-orange-600 dark:text-orange-500 font-sans font-bold">HOJE</span>
+                <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-slate-900 dark:text-white font-serif">
+                  NORDESTE <span className="text-orange-600 dark:text-orange-500 font-sans">HOJE</span>
                 </h1>
-                <span className="bg-orange-100 dark:bg-orange-950/80 text-orange-800 dark:text-orange-300 text-[10px] font-bold px-2 py-0.5 rounded-full border border-orange-300/40">
-                  ECONOMIA & DIÁRIO
+                <span className="bg-orange-100 dark:bg-orange-950/80 text-orange-800 dark:text-orange-300 text-[10px] font-bold px-2.5 py-0.5 rounded-full border border-orange-300/50 uppercase tracking-wider">
+                  PORTAL & DASHBOARD
                 </span>
               </div>
-              <p className="text-xs text-slate-600 dark:text-slate-400">
-                Notícias, Negócios, Ceará, Fortaleza e Capitais Nordestinas
+              <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">
+                Notícias Econômicas Diárias, Indicadores de Mercado, Ceará, Fortaleza e Capitais
               </p>
             </div>
           </div>
 
-          {/* Mobile Right Controls */}
-          <div className="flex items-center gap-1 md:hidden">
+          {/* Mobile Quick Action Buttons */}
+          <div className="flex items-center gap-1.5 md:hidden">
+            {/* Dark Mode Button Mobile */}
             <button
               onClick={onToggleDarkMode}
-              className="p-2 rounded-lg text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
-              aria-label="Alternar tema escuro/claro"
+              className="p-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-slate-100"
+              title={darkMode ? 'Mudar para Modo Claro' : 'Mudar para Modo Escuro'}
             >
-              {darkMode ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4" />}
+              {darkMode ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4 text-slate-700" />}
             </button>
+            {/* Refresh Button Mobile */}
             <button
               onClick={onRefresh}
               disabled={isRefreshing}
-              className="p-2 rounded-lg text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-50"
-              title="Atualizar Notícias"
+              className="p-2 rounded-xl bg-orange-600 text-white"
+              title="Atualizar Notícias Agora"
             >
-              <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin text-orange-600' : ''}`} />
+              <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
             </button>
           </div>
         </div>
 
-        {/* Action Buttons & Navigation Controls */}
+        {/* Action Toolbar */}
         <div className="flex flex-wrap items-center gap-2 sm:gap-2.5">
-          {/* Feed / Salvas switch */}
-          <div className="flex p-0.5 rounded-lg bg-slate-100 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 text-xs">
+          {/* Feed Geral / Notícias Salvas */}
+          <div className="flex p-0.5 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs">
             <button
               onClick={() => onSelectTab('feed')}
-              className={`px-3 py-1.5 rounded-md font-semibold transition-all ${
+              className={`px-3 py-1.5 rounded-lg font-bold transition-all cursor-pointer ${
                 activeTab === 'feed'
                   ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-xs'
                   : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
               }`}
             >
-              Feed Geral
+              Feed Principal
             </button>
             <button
               onClick={() => onSelectTab('saved')}
-              className={`px-3 py-1.5 rounded-md font-semibold flex items-center gap-1.5 transition-all ${
+              className={`px-3 py-1.5 rounded-lg font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
                 activeTab === 'saved'
                   ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-xs'
                   : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
               }`}
             >
               <Bookmark className="w-3.5 h-3.5" />
-              Salvas {savedCount > 0 && <span className="bg-orange-600 text-white text-[10px] px-1.5 py-0.2 rounded-full">{savedCount}</span>}
+              <span>Salvas</span>
+              {savedCount > 0 && (
+                <span className="bg-orange-600 text-white text-[10px] px-1.5 py-0.2 rounded-full">
+                  {savedCount}
+                </span>
+              )}
             </button>
           </div>
 
           {/* Capitais & Cidades Hub */}
           <button
             onClick={onOpenCapitals}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:border-orange-400 dark:hover:border-orange-500 hover:bg-orange-50/50 dark:hover:bg-slate-750 transition-all cursor-pointer shadow-2xs"
           >
             <MapPin className="w-3.5 h-3.5 text-orange-600 dark:text-orange-400" />
-            <span className="hidden sm:inline">Capitais & Cidades</span>
-            <span className="sm:hidden">Capitais</span>
+            <span>Capitais & Cidades</span>
           </button>
 
-          {/* Preferências / Categorias Pessoais */}
+          {/* Categorias de Interesse Pessoal */}
           <button
             onClick={onOpenPreferences}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
-            title="Personalizar categorias de interesse"
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:border-orange-400 dark:hover:border-orange-500 hover:bg-orange-50/50 dark:hover:bg-slate-750 transition-all cursor-pointer shadow-2xs"
+            title="Personalizar categorias de interesse no feed"
           >
-            <SlidersHorizontal className="w-3.5 h-3.5 text-slate-500" />
-            <span className="hidden sm:inline">Meus Interesses</span>
+            <SlidersHorizontal className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400" />
+            <span>Meus Interesses</span>
           </button>
 
-          {/* Exportar Dossiê PDF */}
+          {/* Exportar Dossiê em PDF */}
           <button
             onClick={onOpenDossier}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-slate-800 hover:bg-slate-900 dark:bg-slate-700 dark:hover:bg-slate-600 text-white shadow-xs transition-colors"
-            title="Salvar notícias em PDF"
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-xl bg-slate-900 hover:bg-slate-800 dark:bg-slate-800 dark:hover:bg-slate-700 text-white shadow-xs transition-all cursor-pointer border border-slate-800 dark:border-slate-700"
+            title="Exportar notícias em PDF formatado"
           >
-            <FileDown className="w-3.5 h-3.5 text-amber-300" />
+            <FileDown className="w-3.5 h-3.5 text-amber-400" />
             <span>Salvar em PDF</span>
           </button>
 
-          {/* Botão de Atualizar (Refresh) */}
+          {/* Botão de Atualizar Notícias */}
           <button
             onClick={onRefresh}
             disabled={isRefreshing}
-            className="hidden md:flex items-center gap-2 px-3.5 py-1.5 text-xs font-semibold rounded-lg bg-orange-600 hover:bg-orange-700 active:scale-95 text-white shadow-xs transition-all disabled:opacity-60 cursor-pointer"
-            title="Buscar notícias atualizadas via Google"
+            className="hidden md:flex items-center gap-2 px-3.5 py-1.5 text-xs font-bold rounded-xl bg-gradient-to-r from-orange-600 to-amber-600 hover:from-orange-500 hover:to-amber-500 active:scale-95 text-white shadow-sm transition-all disabled:opacity-60 cursor-pointer"
+            title="Atualizar Notícias Imediatamente com Google Search Grounding"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin' : ''}`} />
-            <span>{isRefreshing ? 'Atualizando...' : 'Atualizar Notícias'}</span>
+            <span>{isRefreshing ? 'Sincronizando...' : 'Atualizar Notícias'}</span>
           </button>
 
-          {/* Modo Noturno / Diurno Toggle */}
+          {/* MODO CLARO / ESCURO (TOGGLE VISÍVEL E ROBUSTO) */}
           <button
             onClick={onToggleDarkMode}
-            className="hidden md:flex items-center justify-center p-2 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+            className="hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-100 text-xs font-bold transition-all cursor-pointer shadow-2xs"
             title={darkMode ? 'Ativar Modo Claro' : 'Ativar Modo Noturno'}
           >
             {darkMode ? (
-              <Sun className="w-4 h-4 text-amber-400" />
+              <>
+                <Sun className="w-4 h-4 text-amber-400 animate-spin-slow" />
+                <span>Modo Claro</span>
+              </>
             ) : (
-              <Moon className="w-4 h-4 text-slate-700" />
+              <>
+                <Moon className="w-4 h-4 text-slate-700" />
+                <span>Modo Noturno</span>
+              </>
             )}
           </button>
         </div>

@@ -3,12 +3,14 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { MarketTicker } from './components/MarketTicker.js';
 import { Header } from './components/Header.js';
 import { IndicatorsBar } from './components/IndicatorsBar.js';
 import { GoogleSearchBar } from './components/GoogleSearchBar.js';
 import { CategoryFilter } from './components/CategoryFilter.js';
 import { NewsCard } from './components/NewsCard.js';
+import { MarketDashboardSidebar } from './components/MarketDashboardSidebar.js';
 import { ArticleModal } from './components/ArticleModal.js';
 import { CapitalsOverviewModal } from './components/CapitalsOverviewModal.js';
 import { PersonalPreferencesModal } from './components/PersonalPreferencesModal.js';
@@ -18,27 +20,32 @@ import { INITIAL_NEWS, REGIONAL_INDICATORS } from './data/seedNews.js';
 import { 
   Sparkles, 
   FileDown, 
-  Filter, 
   Search, 
   AlertCircle, 
   CheckCircle2, 
-  Bookmark, 
-  Compass,
-  ArrowRight,
+  MapPin,
+  RefreshCw,
+  Clock,
   TrendingUp,
   Building2,
-  MapPin,
-  RefreshCw
+  SlidersHorizontal
 } from 'lucide-react';
 import { exportDossierToPdf } from './utils/pdfExport.js';
 
 export default function App() {
   // Theme state: dark / light
   const [darkMode, setDarkMode] = useState<boolean>(() => {
-    const saved = localStorage.getItem('nordeste_theme');
-    if (saved) return saved === 'dark';
-    return window.matchMedia('(prefers-color-scheme: dark)').matches;
+    try {
+      const saved = localStorage.getItem('nordeste_theme');
+      if (saved) return saved === 'dark';
+      return window.matchMedia('(prefers-color-scheme: dark)').matches;
+    } catch {
+      return false;
+    }
   });
+
+  // Countdown timer for 10-minute auto-refresh (600 seconds)
+  const [secondsUntilNextRefresh, setSecondsUntilNextRefresh] = useState<number>(600);
 
   // News and Indicators data
   const [articles, setArticles] = useState<NewsArticle[]>(INITIAL_NEWS);
@@ -73,7 +80,9 @@ export default function App() {
   const [isPreferencesOpen, setIsPreferencesOpen] = useState<boolean>(false);
   const [isCapitalsOpen, setIsCapitalsOpen] = useState<boolean>(false);
   const [isDossierOpen, setIsDossierOpen] = useState<boolean>(false);
-  const [autoRefreshBanner, setAutoRefreshBanner] = useState<string | null>('Atualizando notícias automaticamente ao carregar a plataforma...');
+  const [autoRefreshBanner, setAutoRefreshBanner] = useState<string | null>(
+    'Sincronizando feed diário automaticamente ao carregar a plataforma...'
+  );
 
   // Notification Toast
   const [toastMessage, setToastMessage] = useState<{ text: string; type: 'success' | 'info' | 'error' } | null>(null);
@@ -111,20 +120,29 @@ export default function App() {
     }
   });
 
-  // Apply dark mode class to html element
+  // Toggle Dark Mode with guaranteed DOM synchronization
   useEffect(() => {
+    const root = document.documentElement;
     if (darkMode) {
-      document.documentElement.classList.add('dark');
+      root.classList.add('dark');
+      root.setAttribute('data-theme', 'dark');
+      document.body.classList.add('dark');
       localStorage.setItem('nordeste_theme', 'dark');
     } else {
-      document.documentElement.classList.remove('dark');
+      root.classList.remove('dark');
+      root.setAttribute('data-theme', 'light');
+      document.body.classList.remove('dark');
       localStorage.setItem('nordeste_theme', 'light');
     }
   }, [darkMode]);
 
   // Persist saved articles
   useEffect(() => {
-    localStorage.setItem('nordeste_saved_articles', JSON.stringify(savedArticles));
+    try {
+      localStorage.setItem('nordeste_saved_articles', JSON.stringify(savedArticles));
+    } catch (e) {
+      console.warn('Storage error:', e);
+    }
   }, [savedArticles]);
 
   // Toast timer
@@ -132,7 +150,7 @@ export default function App() {
     setToastMessage({ text, type });
     setTimeout(() => {
       setToastMessage(null);
-    }, 4000);
+    }, 4500);
   };
 
   // Fetch initial news from backend
@@ -147,7 +165,7 @@ export default function App() {
         }
       }
     } catch (err) {
-      console.warn('Backend news API unavailable, utilizing pre-seeded database:', err);
+      console.warn('Backend news API unavailable, using seed dataset:', err);
     }
   };
 
@@ -163,43 +181,13 @@ export default function App() {
     }
   };
 
-  useEffect(() => {
-    // 1. Instantly load initial cache and indicators so UI is immediately visible
-    fetchNews();
-    fetchIndicators();
-
-    // 2. AUTOMATIC REFRESH on every load / reload of the platform
-    handleRefresh(true);
-
-    // 3. Periodic background refresh every 10 minutes
-    const interval = setInterval(() => {
-      handleRefresh(true);
-    }, 10 * 60 * 1000);
-
-    // 4. Auto-refresh if user returns to the tab after 5+ minutes
-    let lastActive = Date.now();
-    const handleVisibility = () => {
-      if (document.visibilityState === 'visible') {
-        const elapsed = Date.now() - lastActive;
-        if (elapsed > 5 * 60 * 1000) {
-          handleRefresh(true);
-        }
-        lastActive = Date.now();
-      }
-    };
-    document.addEventListener('visibilitychange', handleVisibility);
-
-    return () => {
-      clearInterval(interval);
-      document.removeEventListener('visibilitychange', handleVisibility);
-    };
-  }, []);
-
-  // Refresh handler: triggers live Google Search Grounded refresh
+  // Core Refresh Function: Calls Google Search Grounding via backend
   const handleRefresh = async (isAuto = false) => {
     setIsRefreshing(true);
+    setSecondsUntilNextRefresh(600); // Reset 10-minute timer
+
     if (isAuto) {
-      setAutoRefreshBanner('Sincronizando as últimas notícias com o Google Search...');
+      setAutoRefreshBanner('Sincronizando as notícias mais recentes com o Google Search...');
     } else {
       showToast('Consultando as notícias mais recentes no Google Search...', 'info');
     }
@@ -221,7 +209,7 @@ export default function App() {
         const count = data.newCount || 0;
         if (isAuto) {
           showToast(
-            `Refresh automático: ${count > 0 ? `${count} nova(s) notícia(s) incorporadas via Google!` : 'Feed diário sincronizado com o Google Search ao carregar a plataforma!'}`,
+            `Refresh automático: ${count > 0 ? `${count} nova(s) notícia(s) incorporadas via Google!` : 'Feed diário sincronizado ao carregar a plataforma!'}`,
             'success'
           );
         } else {
@@ -232,7 +220,7 @@ export default function App() {
           }
         }
       } else {
-        showToast('Feed verificado com as fontes regionais do dia.', 'info');
+        showToast('Feed sincronizado com as fontes regionais do dia.', 'info');
       }
     } catch (err) {
       console.error('Refresh error:', err);
@@ -244,6 +232,52 @@ export default function App() {
       }, 4000);
     }
   };
+
+  // Ref to handleRefresh for interval usage
+  const handleRefreshRef = useRef(handleRefresh);
+  useEffect(() => {
+    handleRefreshRef.current = handleRefresh;
+  });
+
+  // 1. Automatic refresh on load AND every 10 minutes strictly
+  useEffect(() => {
+    // A. Initial load of news and indicators
+    fetchNews();
+    fetchIndicators();
+
+    // B. Trigger automatic refresh immediately on platform load!
+    handleRefreshRef.current(true);
+
+    // C. 1-Second countdown clock for the 10-minute (600s) auto-refresh cycle
+    const countdownTimer = setInterval(() => {
+      setSecondsUntilNextRefresh((prev) => {
+        if (prev <= 1) {
+          // 10 minutes elapsed, trigger refresh!
+          handleRefreshRef.current(true);
+          return 600;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    // D. Auto-refresh if user returns to tab after being away for 5+ minutes
+    let lastActive = Date.now();
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        const elapsed = Date.now() - lastActive;
+        if (elapsed > 5 * 60 * 1000) {
+          handleRefreshRef.current(true);
+        }
+        lastActive = Date.now();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+
+    return () => {
+      clearInterval(countdownTimer);
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
+  }, []);
 
   // Google Search query execution
   const handleExecuteSearch = async (query: string) => {
@@ -266,7 +300,7 @@ export default function App() {
         const data = await res.json();
         if (data.articles) {
           setArticles(data.articles);
-          showToast(`Resultados do Google para "${query}"`, 'success');
+          showToast(`Resultados do Google Search para "${query}"`, 'success');
         }
       }
     } catch (err) {
@@ -280,7 +314,7 @@ export default function App() {
   const handleToggleSave = (article: NewsArticle) => {
     if (savedArticles.includes(article.id)) {
       setSavedArticles(savedArticles.filter((id) => id !== article.id));
-      showToast('Matéria removida dos seus salvos.', 'info');
+      showToast('Matéria removida dos seus favoritos.', 'info');
     } else {
       setSavedArticles([...savedArticles, article.id]);
       showToast('Matéria salva para leitura posterior!', 'success');
@@ -350,7 +384,7 @@ export default function App() {
     return counts;
   }, [articles]);
 
-  // First featured article and remaining list
+  // Lead story (Manchete principal)
   const featuredArticle = useMemo(() => {
     if (activeTab === 'saved' || selectedCategory !== 'todos') {
       return null;
@@ -364,10 +398,17 @@ export default function App() {
   }, [filteredArticles, featuredArticle]);
 
   return (
-    <div className="min-h-screen bg-slate-100 dark:bg-slate-950 text-slate-900 dark:text-slate-100 transition-colors duration-200">
-      {/* Toast Notification */}
+    <div className="min-h-screen bg-[#f4f6f9] dark:bg-[#080c14] text-slate-900 dark:text-slate-100 transition-colors duration-250 font-sans">
+      {/* 1. Real-Time Financial & Market Ticker Bar (Top of Portal) */}
+      <MarketTicker
+        secondsUntilNextRefresh={secondsUntilNextRefresh}
+        isRefreshing={isRefreshing}
+        onManualRefresh={() => handleRefresh(false)}
+      />
+
+      {/* 2. Toast Notification */}
       {toastMessage && (
-        <div className="fixed bottom-5 right-5 z-50 flex items-center gap-2.5 px-4 py-3 rounded-2xl shadow-xl border bg-slate-900 text-white border-slate-700 animate-in slide-in-from-bottom duration-200 text-xs font-medium">
+        <div className="fixed bottom-5 right-5 z-50 flex items-center gap-2.5 px-4 py-3 rounded-2xl shadow-2xl border bg-slate-900 text-white border-slate-700 animate-in slide-in-from-bottom duration-200 text-xs font-medium">
           {toastMessage.type === 'success' && <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />}
           {toastMessage.type === 'info' && <Sparkles className="w-4 h-4 text-amber-400 shrink-0" />}
           {toastMessage.type === 'error' && <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />}
@@ -375,13 +416,14 @@ export default function App() {
         </div>
       )}
 
-      {/* Main Header */}
+      {/* 3. Main Portal Masthead & Navigation */}
       <Header
         darkMode={darkMode}
         onToggleDarkMode={() => setDarkMode(!darkMode)}
         onRefresh={() => handleRefresh(false)}
         isRefreshing={isRefreshing}
         lastUpdated={lastUpdated}
+        secondsUntilNextRefresh={secondsUntilNextRefresh}
         onOpenPreferences={() => setIsPreferencesOpen(true)}
         onOpenCapitals={() => setIsCapitalsOpen(true)}
         onOpenDossier={() => setIsDossierOpen(true)}
@@ -396,23 +438,25 @@ export default function App() {
         }}
       />
 
-      {/* Page Container */}
+      {/* 4. Page Main Container */}
       <main className="max-w-7xl mx-auto px-4 sm:px-8 py-6">
         {/* Auto-Refresh Banner Notification on Load */}
         {autoRefreshBanner && (
-          <div className="mb-4 flex items-center justify-between p-3.5 rounded-2xl bg-gradient-to-r from-orange-500/10 via-amber-500/10 to-emerald-500/10 border border-orange-300/80 dark:border-orange-500/30 backdrop-blur-md shadow-xs animate-in fade-in duration-300">
+          <div className="mb-5 flex items-center justify-between p-3.5 rounded-2xl bg-gradient-to-r from-orange-500/10 via-amber-500/10 to-emerald-500/10 border border-orange-300 dark:border-orange-500/40 backdrop-blur-md shadow-xs animate-in fade-in duration-300">
             <div className="flex items-center gap-2.5 text-xs text-orange-950 dark:text-orange-200">
               <span className="p-1.5 rounded-lg bg-orange-600 text-white shrink-0 shadow-xs">
                 <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin' : ''}`} />
               </span>
               <div>
-                <span className="font-bold text-orange-900 dark:text-orange-300">Refresh Automático Ativo:</span>{' '}
+                <span className="font-bold text-orange-900 dark:text-orange-300">
+                  Sincronização Automática Ativa:
+                </span>{' '}
                 <span>{autoRefreshBanner}</span>
               </div>
             </div>
             <button
               onClick={() => setAutoRefreshBanner(null)}
-              className="text-xs text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1"
+              className="text-xs text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1 cursor-pointer"
               title="Fechar aviso"
             >
               ✕
@@ -420,7 +464,7 @@ export default function App() {
           </div>
         )}
 
-        {/* Indicators Bar */}
+        {/* Strategic Indicators Bar (PIB Nordeste, Fortaleza Líder, Pecém H2V, Empregos) */}
         <IndicatorsBar
           indicators={indicators}
           onSelectIndicatorCategory={(cat) => {
@@ -431,7 +475,7 @@ export default function App() {
           }}
         />
 
-        {/* Google Default Search Bar */}
+        {/* Google Default Search Grounding Bar */}
         <GoogleSearchBar
           searchQuery={searchQuery}
           onSearchChange={setSearchQuery}
@@ -453,14 +497,14 @@ export default function App() {
                 setSelectedCity('TODAS');
                 setSelectedState('TODOS');
               }}
-              className="text-xs font-semibold text-orange-700 dark:text-orange-300 hover:underline"
+              className="text-xs font-semibold text-orange-700 dark:text-orange-300 hover:underline cursor-pointer"
             >
               Limpar filtro de cidade
             </button>
           </div>
         )}
 
-        {/* Categories & State Filters */}
+        {/* Categories Bar & State Selector */}
         <CategoryFilter
           selectedCategory={selectedCategory}
           onSelectCategory={(cat) => {
@@ -474,115 +518,137 @@ export default function App() {
           onToggleHighImpact={() => setHighImpactOnly(!highImpactOnly)}
         />
 
-        {/* Section Header with Quick Actions */}
-        <div className="flex flex-wrap items-center justify-between gap-3 mb-6 pb-3 border-b border-slate-200 dark:border-slate-800">
-          <div className="flex items-center gap-2">
-            <h2 className="text-xl font-bold font-serif text-slate-900 dark:text-white">
-              {activeTab === 'saved' ? 'Minhas Notícias Salvas' : 'Notícias do Dia'}
-            </h2>
-            <span className="text-xs px-2.5 py-0.5 rounded-full bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-semibold">
-              {filteredArticles.length} matérias
-            </span>
-          </div>
+        {/* Multi-Column News Portal & Market Dashboard Layout */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 mt-6">
+          {/* Main Feed Column (8 of 12 columns on desktop) */}
+          <div className="lg:col-span-8 space-y-6">
+            {/* Section Header with Quick Actions */}
+            <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-slate-200 dark:border-slate-800">
+              <div className="flex items-center gap-2.5">
+                <span className="w-2.5 h-2.5 rounded-full bg-orange-600 dark:bg-orange-500" />
+                <h2 className="text-xl font-bold font-serif text-slate-900 dark:text-white">
+                  {activeTab === 'saved' ? 'Minhas Notícias Salvas' : 'Edição Diária & Notícias de Mercado'}
+                </h2>
+                <span className="text-xs px-2.5 py-0.5 rounded-full bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-semibold font-mono">
+                  {filteredArticles.length} matérias
+                </span>
+              </div>
 
-          <div className="flex items-center gap-2">
-            {/* Quick Dossier Button */}
-            <button
-              onClick={() => exportDossierToPdf(filteredArticles, `Dossiê ${selectedCategory !== 'todos' ? selectedCategory : 'Nordeste Hoje'}`)}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-800 text-xs font-medium transition-colors"
-              title="Baixar lista atual em formato PDF"
-            >
-              <FileDown className="w-3.5 h-3.5 text-orange-600 dark:text-orange-400" />
-              <span>Baixar Todas em PDF ({filteredArticles.length})</span>
-            </button>
+              <div className="flex items-center gap-2">
+                {/* Download PDF button */}
+                <button
+                  onClick={() => exportDossierToPdf(filteredArticles, `Dossiê ${selectedCategory !== 'todos' ? selectedCategory : 'Nordeste Hoje'}`)}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-750 text-xs font-semibold transition-colors cursor-pointer shadow-2xs"
+                  title="Baixar lista atual em formato PDF"
+                >
+                  <FileDown className="w-3.5 h-3.5 text-orange-600 dark:text-orange-400" />
+                  <span className="hidden sm:inline">Salvar em PDF</span>
+                  <span className="sm:hidden">PDF</span>
+                  <span className="text-[10px] bg-slate-100 dark:bg-slate-700 px-1 rounded">
+                    {filteredArticles.length}
+                  </span>
+                </button>
 
-            {/* Refresh Button */}
-            <button
-              onClick={() => handleRefresh(false)}
-              disabled={isRefreshing}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-orange-600 hover:bg-orange-700 text-white text-xs font-semibold shadow-xs transition-colors disabled:opacity-50 cursor-pointer"
-            >
-              <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin' : ''}`} />
-              <span className="hidden sm:inline">Atualizar Feed</span>
-            </button>
-          </div>
-        </div>
-
-        {/* Empty State */}
-        {filteredArticles.length === 0 && (
-          <div className="text-center py-16 px-4 bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 my-6 shadow-xs">
-            <div className="w-12 h-12 mx-auto rounded-2xl bg-orange-100 dark:bg-orange-950/60 text-orange-600 flex items-center justify-center mb-3">
-              <Search className="w-6 h-6" />
+                {/* Refresh Button */}
+                <button
+                  onClick={() => handleRefresh(false)}
+                  disabled={isRefreshing}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-orange-600 hover:bg-orange-700 text-white text-xs font-bold shadow-xs transition-colors disabled:opacity-50 cursor-pointer"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin' : ''}`} />
+                  <span className="hidden sm:inline">Atualizar Agora</span>
+                </button>
+              </div>
             </div>
-            <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-1">
-              Nenhuma notícia encontrada com os filtros selecionados
-            </h3>
-            <p className="text-xs text-slate-500 max-w-md mx-auto mb-4">
-              Tente redefinir a busca, selecionar 'Todos os Estados' ou clicar em 'Atualizar Notícias' para pesquisar no Google.
-            </p>
-            <div className="flex justify-center gap-3">
-              <button
-                onClick={() => {
-                  setSelectedCategory('todos');
-                  setSelectedState('TODOS');
-                  setSelectedCity('TODAS');
-                  setHighImpactOnly(false);
-                  setSearchQuery('');
-                  fetchNews();
-                }}
-                className="px-4 py-2 rounded-xl bg-orange-600 text-white text-xs font-semibold hover:bg-orange-700 transition-colors"
-              >
-                Limpar Todos os Filtros
-              </button>
-              <button
-                onClick={() => handleRefresh(false)}
-                className="px-4 py-2 rounded-xl bg-slate-200 dark:bg-slate-800 text-slate-800 dark:text-slate-200 text-xs font-semibold hover:bg-slate-300 dark:hover:bg-slate-700 transition-colors"
-              >
-                Pesquisar no Google
-              </button>
+
+            {/* Empty State */}
+            {filteredArticles.length === 0 && (
+              <div className="text-center py-16 px-4 bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 my-6 shadow-xs">
+                <div className="w-12 h-12 mx-auto rounded-2xl bg-orange-100 dark:bg-orange-950/60 text-orange-600 flex items-center justify-center mb-3">
+                  <Search className="w-6 h-6" />
+                </div>
+                <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-1">
+                  Nenhuma matéria encontrada com os filtros atuais
+                </h3>
+                <p className="text-xs text-slate-500 max-w-md mx-auto mb-4">
+                  Tente redefinir a busca, selecionar 'Todos os Estados' ou clicar em 'Atualizar Notícias' para pesquisar no Google.
+                </p>
+                <div className="flex justify-center gap-3">
+                  <button
+                    onClick={() => {
+                      setSelectedCategory('todos');
+                      setSelectedState('TODOS');
+                      setSelectedCity('TODAS');
+                      setHighImpactOnly(false);
+                      setSearchQuery('');
+                      fetchNews();
+                    }}
+                    className="px-4 py-2 rounded-xl bg-orange-600 text-white text-xs font-semibold hover:bg-orange-700 transition-colors cursor-pointer"
+                  >
+                    Limpar Todos os Filtros
+                  </button>
+                  <button
+                    onClick={() => handleRefresh(false)}
+                    className="px-4 py-2 rounded-xl bg-slate-200 dark:bg-slate-800 text-slate-800 dark:text-slate-200 text-xs font-semibold hover:bg-slate-300 dark:hover:bg-slate-700 transition-colors cursor-pointer"
+                  >
+                    Pesquisar no Google
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Lead Story: Featured Article Card */}
+            {featuredArticle && (
+              <NewsCard
+                article={featuredArticle}
+                onRead={(art) => setReadingArticle(art)}
+                isSaved={savedArticles.includes(featuredArticle.id)}
+                onToggleSave={handleToggleSave}
+                isSelectedForDossier={selectedForDossier.includes(featuredArticle.id)}
+                onToggleDossierSelect={handleToggleDossierSelect}
+                isFeatured={true}
+              />
+            )}
+
+            {/* Regular News Grid (2 columns on tablet/desktop) */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+              {regularArticles.map((article) => (
+                <NewsCard
+                  key={article.id}
+                  article={article}
+                  onRead={(art) => setReadingArticle(art)}
+                  isSaved={savedArticles.includes(article.id)}
+                  onToggleSave={handleToggleSave}
+                  isSelectedForDossier={selectedForDossier.includes(article.id)}
+                  onToggleDossierSelect={handleToggleDossierSelect}
+                />
+              ))}
             </div>
           </div>
-        )}
 
-        {/* Featured Article Card */}
-        {featuredArticle && (
-          <NewsCard
-            article={featuredArticle}
-            onRead={(art) => setReadingArticle(art)}
-            isSaved={savedArticles.includes(featuredArticle.id)}
-            onToggleSave={handleToggleSave}
-            isSelectedForDossier={selectedForDossier.includes(featuredArticle.id)}
-            onToggleDossierSelect={handleToggleDossierSelect}
-            isFeatured={true}
-          />
-        )}
-
-        {/* Regular Articles Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-          {regularArticles.map((article) => (
-            <NewsCard
-              key={article.id}
-              article={article}
-              onRead={(art) => setReadingArticle(art)}
-              isSaved={savedArticles.includes(article.id)}
-              onToggleSave={handleToggleSave}
-              isSelectedForDossier={selectedForDossier.includes(article.id)}
-              onToggleDossierSelect={handleToggleDossierSelect}
+          {/* Sidebar Column: Market Intelligence & Financial Dashboard (4 of 12 columns) */}
+          <div className="lg:col-span-4">
+            <MarketDashboardSidebar
+              indicators={indicators}
+              onSelectCategory={(cat) => setSelectedCategory(cat)}
+              onSelectState={(st) => setSelectedState(st)}
+              onOpenCapitals={() => setIsCapitalsOpen(true)}
+              onOpenDossier={() => setIsDossierOpen(true)}
             />
-          ))}
+          </div>
         </div>
       </main>
 
-      {/* Footer */}
-      <footer className="mt-16 border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 py-10 px-4 sm:px-8 text-xs text-slate-500 dark:text-slate-400">
+      {/* 5. Editorial Footer */}
+      <footer className="mt-16 border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 py-12 px-4 sm:px-8 text-xs text-slate-500 dark:text-slate-400">
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-6">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-orange-600 text-white font-black flex items-center justify-center text-sm">
+            <div className="w-9 h-9 rounded-xl bg-orange-600 text-white font-black flex items-center justify-center text-sm shadow-md">
               NE
             </div>
             <div>
-              <div className="font-bold text-slate-900 dark:text-white font-serif">
-                Nordeste Hoje - Notícias & Inteligência Diária
+              <div className="font-bold text-slate-900 dark:text-white font-serif text-sm">
+                Nordeste Hoje - Portal & Dashboard de Mercado
               </div>
               <div className="text-[11px] text-slate-400">
                 Cobertura de Economia, Mercado, Ceará, Fortaleza, Capitais e Empresas
@@ -593,21 +659,21 @@ export default function App() {
           <div className="flex flex-wrap items-center justify-center gap-4 text-xs">
             <button
               onClick={() => setIsCapitalsOpen(true)}
-              className="hover:text-orange-600 transition-colors"
+              className="hover:text-orange-600 transition-colors cursor-pointer"
             >
               As 9 Capitais do Nordeste
             </button>
             <span>•</span>
             <button
               onClick={() => setIsPreferencesOpen(true)}
-              className="hover:text-orange-600 transition-colors"
+              className="hover:text-orange-600 transition-colors cursor-pointer"
             >
               Filtrar Interesses Pessoais
             </button>
             <span>•</span>
             <button
               onClick={() => setIsDossierOpen(true)}
-              className="hover:text-orange-600 transition-colors"
+              className="hover:text-orange-600 transition-colors cursor-pointer"
             >
               Exportar em PDF
             </button>
@@ -617,14 +683,15 @@ export default function App() {
             </span>
           </div>
 
-          <div className="text-[11px] text-slate-400">
-            Atualização em tempo real mediante botão de refresh
+          <div className="text-[11px] text-slate-400 flex items-center gap-1.5">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+            <span>Auto-refresh ao carregar e a cada 10 minutos</span>
           </div>
         </div>
       </footer>
 
-      {/* Modals */}
-      {/* 1. Article Modal Reader */}
+      {/* 6. Modals */}
+      {/* Article Reader Modal */}
       <ArticleModal
         article={readingArticle}
         onClose={() => setReadingArticle(null)}
@@ -632,7 +699,7 @@ export default function App() {
         onToggleSave={handleToggleSave}
       />
 
-      {/* 2. Capitals & Cities Overview Modal */}
+      {/* Capitals & Cities Overview Modal */}
       <CapitalsOverviewModal
         isOpen={isCapitalsOpen}
         onClose={() => setIsCapitalsOpen(false)}
@@ -643,21 +710,25 @@ export default function App() {
         }}
       />
 
-      {/* 3. Personal Preferences Modal */}
+      {/* Personal Preferences Modal */}
       <PersonalPreferencesModal
         isOpen={isPreferencesOpen}
         onClose={() => setIsPreferencesOpen(false)}
         preferences={preferences}
         onSavePreferences={(newPrefs) => {
           setPreferences(newPrefs);
-          localStorage.setItem('nordeste_preferences', JSON.stringify(newPrefs));
+          try {
+            localStorage.setItem('nordeste_preferences', JSON.stringify(newPrefs));
+          } catch (e) {
+            console.warn(e);
+          }
           setSelectedState(newPrefs.selectedState);
           setHighImpactOnly(newPrefs.highImpactOnly);
           showToast('Suas preferências de interesse pessoal foram salvas!', 'success');
         }}
       />
 
-      {/* 4. Dossier PDF Exporter Modal */}
+      {/* Dossier PDF Exporter Modal */}
       <DossierModal
         isOpen={isDossierOpen}
         onClose={() => setIsDossierOpen(false)}

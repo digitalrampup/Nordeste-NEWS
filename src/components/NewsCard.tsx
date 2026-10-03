@@ -77,18 +77,18 @@ export const NewsCard: React.FC<NewsCardProps> = ({
     return (
       <article
         onClick={() => onRead(article)}
-        className="group relative bg-gradient-to-br from-white via-white to-orange-50/30 dark:from-slate-800 dark:via-slate-800 dark:to-slate-800/90 rounded-2xl p-5 sm:p-7 border-2 border-orange-200 dark:border-orange-500/30 shadow-md hover:shadow-xl transition-all duration-300 cursor-pointer mb-6"
+        className="group relative bg-gradient-to-br from-white via-white to-orange-50/40 dark:from-slate-900 dark:via-slate-900 dark:to-slate-850 rounded-2xl p-6 sm:p-7 border-2 border-orange-300 dark:border-orange-500/40 shadow-sm hover:shadow-xl transition-all duration-300 cursor-pointer mb-6"
       >
         {/* Top Badges & Select Bar */}
         <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
           <div className="flex flex-wrap items-center gap-2">
             <span className="bg-orange-600 text-white text-[11px] font-bold px-2.5 py-0.5 rounded-md uppercase tracking-wider shadow-xs">
-              Destaque Principal
+              Manchete Principal
             </span>
             <span className={`text-[11px] font-bold px-2 py-0.5 rounded-md border ${getStateBadgeColor(article.state)}`}>
               {article.state} {article.city ? `• ${article.city}` : ''}
             </span>
-            <span className="text-[11px] font-semibold text-orange-700 dark:text-orange-400 bg-orange-100 dark:bg-orange-950/60 px-2 py-0.5 rounded-md">
+            <span className="text-[11px] font-semibold text-orange-700 dark:text-orange-400 bg-orange-100 dark:bg-orange-950/80 px-2 py-0.5 rounded-md border border-orange-200 dark:border-orange-900/60">
               {article.categoryLabel}
             </span>
           </div>
@@ -111,7 +111,7 @@ export const NewsCard: React.FC<NewsCardProps> = ({
               className={`p-1.5 rounded-lg transition-colors ${
                 isSaved
                   ? 'text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-950/60'
-                  : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700'
+                  : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800'
               }`}
               title={isSaved ? 'Remover dos favoritos' : 'Salvar nos favoritos'}
             >
@@ -132,12 +132,12 @@ export const NewsCard: React.FC<NewsCardProps> = ({
 
         {/* Key Takeaways */}
         {article.keyPoints && article.keyPoints.length > 0 && (
-          <div className="bg-slate-50 dark:bg-slate-900/60 rounded-xl p-3.5 mb-4 border border-slate-200/80 dark:border-slate-700/60">
-            <div className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-2 flex items-center gap-1.5">
+          <div className="bg-slate-50 dark:bg-slate-950/70 rounded-xl p-4 mb-4 border border-slate-200/90 dark:border-slate-800">
+            <div className="text-[11px] font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400 mb-2 flex items-center gap-1.5">
               <Sparkles className="w-3.5 h-3.5 text-orange-500" />
-              <span>Pontos de Impacto & Indicadores:</span>
+              <span>Pontos de Impacto & Indicadores Chave:</span>
             </div>
-            <ul className="space-y-1.5 text-xs text-slate-700 dark:text-slate-300">
+            <ul className="space-y-1.5 text-xs text-slate-700 dark:text-slate-200">
               {article.keyPoints.map((kp, idx) => (
                 <li key={idx} className="flex items-start gap-2">
                   <span className="w-1.5 h-1.5 rounded-full bg-orange-500 mt-1.5 shrink-0" />
@@ -149,7 +149,7 @@ export const NewsCard: React.FC<NewsCardProps> = ({
         )}
 
         {/* Bottom Metadata & Actions */}
-        <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-slate-200 dark:border-slate-700 text-xs">
+        <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-slate-200 dark:border-slate-800 text-xs">
           <div className="flex flex-wrap items-center gap-3 text-slate-500 dark:text-slate-400 text-[11px]">
             <span className="flex items-center gap-1">
               <Clock className="w-3.5 h-3.5" />
@@ -171,7 +171,7 @@ export const NewsCard: React.FC<NewsCardProps> = ({
           <div className="flex items-center gap-2">
             <button
               onClick={handlePdfExport}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 dark:bg-slate-700 dark:hover:bg-slate-600 text-slate-800 dark:text-slate-200 font-medium transition-colors"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 font-medium transition-colors"
               title="Baixar esta notícia em PDF"
             >
               <FileDown className="w-3.5 h-3.5 text-orange-600 dark:text-orange-400" />
@@ -195,7 +195,7 @@ export const NewsCard: React.FC<NewsCardProps> = ({
   return (
     <article
       onClick={() => onRead(article)}
-      className="group relative bg-white dark:bg-slate-800/90 rounded-2xl p-5 border border-slate-200 dark:border-slate-700/80 hover:border-orange-300 dark:hover:border-slate-600 shadow-xs hover:shadow-md transition-all duration-200 cursor-pointer flex flex-col justify-between"
+      className="group relative bg-white dark:bg-slate-900 rounded-2xl p-5 border border-slate-200 dark:border-slate-800 hover:border-orange-400 dark:hover:border-orange-500/50 shadow-xs hover:shadow-md transition-all duration-200 cursor-pointer flex flex-col justify-between"
     >
       <div>
         {/* Top Badges */}
@@ -204,7 +204,7 @@ export const NewsCard: React.FC<NewsCardProps> = ({
             <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md border ${getStateBadgeColor(article.state)}`}>
               {article.state}
             </span>
-            <span className="text-[10px] font-semibold text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-slate-700 px-2 py-0.5 rounded-md line-clamp-1">
+            <span className="text-[10px] font-semibold text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-md line-clamp-1 border border-slate-200/60 dark:border-slate-750">
               {article.categoryLabel}
             </span>
           </div>
@@ -247,7 +247,7 @@ export const NewsCard: React.FC<NewsCardProps> = ({
 
         {/* Key bullet point snippet */}
         {article.keyPoints && article.keyPoints.length > 0 && (
-          <div className="text-[11px] text-slate-700 dark:text-slate-300 bg-slate-50 dark:bg-slate-900/50 p-2 rounded-lg mb-3 border border-slate-100 dark:border-slate-800 line-clamp-2">
+          <div className="text-[11px] text-slate-700 dark:text-slate-300 bg-slate-50 dark:bg-slate-950/60 p-2.5 rounded-xl mb-3 border border-slate-100 dark:border-slate-800 line-clamp-2">
             <span className="font-semibold text-orange-600 dark:text-orange-400 mr-1">Destaque:</span>
             {article.keyPoints[0]}
           </div>
@@ -255,7 +255,7 @@ export const NewsCard: React.FC<NewsCardProps> = ({
       </div>
 
       {/* Footer info & actions */}
-      <div className="pt-3 border-t border-slate-100 dark:border-slate-700/60 flex items-center justify-between text-xs mt-auto">
+      <div className="pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs mt-auto">
         <div className="text-[11px] text-slate-400 flex items-center gap-1.5">
           <span>{article.publishedAt}</span>
           <span>•</span>
@@ -265,7 +265,7 @@ export const NewsCard: React.FC<NewsCardProps> = ({
         <div className="flex items-center gap-1.5">
           <button
             onClick={handlePdfExport}
-            className="p-1.5 rounded-md hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-500 hover:text-orange-600 dark:hover:text-orange-400 transition-colors"
+            className="p-1.5 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 hover:text-orange-600 dark:hover:text-orange-400 transition-colors"
             title="Salvar esta notícia em PDF"
           >
             <FileDown className="w-3.5 h-3.5" />
